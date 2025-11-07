@@ -20,14 +20,12 @@ const totalCliques = new client.Counter({
     help: 'Contador de cliques no botão de teste'
 });
 
-// --- INÍCIO DA CORREÇÃO ---
-// A rota principal agora aponta para o arquivo correto
+//ROTA FEITA EM AULA
 app.get('/', (req, res) => {
     counter.inc();
-    // CORRIGIDO: Removido o 'public' do caminho
-    res.sendFile(path.join(__dirname, 'index.html'));
+    //MUDEI PARA CARREGAR O INDEX.HTML
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-// --- FIM DA CORREÇÃO ---
 
 //ROTA FEITA EM AULA
 app.get('/metrics', async (req, res) => {
@@ -41,7 +39,6 @@ app.post('/contando', (req, res) => {
     res.status(200).send('Clicado');
 });
 
-// Certifique-se de que a porta aqui é a mesma do seu Dockerfile (3123)
 app.listen(3123, () => {
-    console.log('Servidor rodando na porta 3123');
+    console.log('App rodando na porta 3123');
 });
