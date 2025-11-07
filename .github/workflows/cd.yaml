@@ -1,0 +1,86 @@
+# Nome do Workflow de CD (Continuous Deployment)
+name: CD - Deploy to Kubernetes
+
+on:
+  workflow_run:
+    # O 'name' aqui DEVE ser idêntico ao 'name:' no seu arquivo ci.yml
+    workflows: ["CI - Build & Push Docker"]
+    types: ["completed"]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Só executa se o workflow de CI (workflow_run) foi um SUCESSO
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production # opcional: exige aprovação de ambiente no GitHub
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set vars
+        id: vars
+        run: |
+          # --- MUDANÇA 1 ---
+          # Atualizado para o nome correto da imagem no Docker Hub
+          echo "IMAGE=ensfla/grafeno" >> $GITHUB_OUTPUT
+          
+          # Pega o SHA curto do commit que disparou o CI (workflow_run)
+          echo "TAG_SHA=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          
+          echo "NAMESPACE=${{ secrets.K8S_NAMESPACE || 'default' }}" >> $GITHUB_OUTPUT
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest' # 'latest' é ok, mas fixar uma versão é mais estável
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > $HOME/.kube/config
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || \
+          kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}
+
+      # Aplica/garante os serviços/ingress/etc. estáticos
+      # (Garante que os arquivos YAML estão corretos e sem quebras de linha)
+      - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
+        run: |
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml || true
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-deployment.yaml || true
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/grafana-deployment.yaml || true
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-deployment.yaml || true
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-service.yaml || true
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-config.yaml || true
+
+      # Aplica/garante o Deployment (se ainda não existir)
+      - name: Apply app deployment (first time)
+        run: |
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml
+
+      # Atualiza a imagem para a tag nova (idempotente)
+      - name: Set image to new tag
+        run: |
+          # --- MUDANÇA 2 ---
+          # Assumindo que seu deployment e container se chamam 'grafeno'
+          # Mude 'deployment/grafeno' e 'grafeno=' se os nomes forem diferentes
+          kubectl set image deployment/grafeno grafeno=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n ${{ steps.vars.outputs.NAMESPACE }}
+
+      - name: Wait rollout
+        run: |
+          # --- MUDANÇA 3 ---
+          # Deve ser o mesmo nome do deployment da 'MUDANÇA 2'
+          kubectl rollout status deployment/grafeno -n ${{ steps.vars.outputs.NAMESPACE }} --timeout=120s
+
+      - name: Show services (debug)
+        run: |
+          kubectl get svc -n ${{ steps.vars.outputs.NAMESPACE }}
+          kubectl get pods -o wide -n ${{ steps.vars.outputs.NAMESPACE }}

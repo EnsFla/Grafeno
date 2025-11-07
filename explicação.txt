@@ -1,0 +1,25 @@
+minikube start --driver=docker
+# comando para rodar o kubernets usando o driver do docker
+
+kubectl get pods
+# lista os containers
+
+& minikube -p minikube docker-env | invoke-expression
+
+docker build -t grafeno .
+
+docker images
+
+kubectl apply -f ./k8s/
+kubectl get pods
+
+minikube service prometheus
+minikube service grafana
+minikube service grafeno
+
+ngnixdeployment
+nginxk8s -> defaultconfig/dockerfile
+
+nginx -> rodar o minikube do nginx
+
+Senha Grafana => TesteSenhaTrabalho

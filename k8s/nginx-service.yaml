@@ -1,0 +1,22 @@
+#versao da api dos kubernets
+apiVersion: v1
+#cria um objeto do tipo service
+#service expoe um conjunto de pods em rede
+kind: Service
+metadata:
+  #define um nome para o service
+  name: nginx-service
+spec:
+  #nodport deixa o servico acessivel fora do cluster dos kubernets
+  #abrindo uma porta em cada nó do cluster
+  type: NodePort
+  #definimos as portas
+  ports:
+  - port: 80 #porta exposta dentro do cluster
+    targetPort: 80 #porta no container aonde o trafego sera enviado
+    nodePort: 30080 #a porta que serà aberta em cada nó
+                    #usado para acessar o nginx
+  #selector define quais pods o trafego serà enviado
+  #usando a tag app: ngnix como base
+  selector:
+    app: nginx

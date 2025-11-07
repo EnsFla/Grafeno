@@ -1,0 +1,29 @@
+#versao da api dos kubernets
+apiVersion: apps/v1
+#cria um objeto do tipo deployment
+#esse objeto gerencia e atualiza os pods
+kind: Deployment
+metadata:
+  #define um nome para o objeto
+  name: nginx
+spec:
+  #mantem uma replica do container do nginx rodando
+  replicas: 1
+  #selector define quais pods o nosso objeto pode gerenciar
+  #nesse caso objetos com app: nginx
+  selector:
+    matchLabels:
+      app: nginx
+  #template define qual pod sera criado
+  template:
+    metadata:
+      #adiciona etiquetas as pods criados usando esse objeto
+      #esse nome define oq o selector vai procurar
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+          - containerPort: 80

@@ -1,0 +1,22 @@
+#CODGGO FEITO EM SALA
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafeno
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafeno
+  template:
+    metadata:
+      labels:
+        app: grafeno
+    spec:
+      containers:
+        - name: grafeno
+          image: ensfla/grafeno:latest
+          imagePullPolicy: IfNotPresent 
+          ports:
+          - containerPort: 3123

@@ -1,0 +1,14 @@
+#CODGGO FEITO EM SALA
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+    scrape_configs:
+      - job_name: 'grafeno'
+        static_configs:
+          - targets: ['grafeno-service:3123']

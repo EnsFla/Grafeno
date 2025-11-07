@@ -1,0 +1,14 @@
+#CODGGO FEITO EM SALA
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafeno-service
+spec:
+  selector:
+    app: grafeno
+  ports:
+  - protocol: TCP
+    port: 3123
+    targetPort: 3123
+  type: NodePort
