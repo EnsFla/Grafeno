@@ -1,4 +1,3 @@
-# Nome do Workflow de CD (Continuous Deployment)
 name: CD - Deploy to Kubernetes
 
 on:
@@ -15,11 +14,9 @@ jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     
-    # Esta é a mudança principal: rodar no seu PC
     runs-on: self-hosted
     environment: production
 
-    # Define o namespace para todo o job, com 'default' como fallback
     env:
       K8S_NAMESPACE: ${{ secrets.K8S_NAMESPACE || 'default' }}
 
@@ -27,8 +24,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # --- INÍCIO DA CORREÇÃO ---
-      # Comandos traduzidos para PowerShell (removido 'shell: bash')
       - name: Set vars
         id: vars
         run: |

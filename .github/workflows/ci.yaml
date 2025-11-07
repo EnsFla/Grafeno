@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: read
-  packages: write # Útil se você for migrar para o GHCR
+  packages: write
 
 jobs:
   ci:
@@ -39,15 +39,6 @@ jobs:
           else
             echo "Sem script de teste. Pulando etapa."
           fi
-      
-      # Opcional: linters
-      # - name: Lint
-      #   run: |
-      #     if npm run | grep -q " lint"; then
-      #       npm run lint
-      #     else
-      #       echo "Sem script lint. Pulando."
-      #     fi
 
       - name: Set image tags
         id: vars
@@ -55,10 +46,7 @@ jobs:
           echo "IMAGE=ensfla/grafeno" >> $GITHUB_OUTPUT
           echo "TAG_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      # --- Etapas de Docker - SÓ rodam em PUSH para a 'main' ---
-
       - name: Setup QEMU
-        # Esta condição é crucial para segurança!
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/setup-qemu-action@v3
 
@@ -78,15 +66,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./dockerfile # Garanta que o nome do arquivo (dockerfile vs Dockerfile) está correto
+          file: ./dockerfile
           push: true
           tags: |
             ${{ steps.vars.outputs.IMAGE }}:latest
             ${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }}
-          
-          # --- Sintaxe de Cache Corrigida ---
-          # Tenta puxar a cache, mas não falha se ela não existir (ex: primeira run)
+
           cache-from: type=registry,ref=${{ steps.vars.outputs.IMAGE }}:buildcache,ignore-error=true
-          
-          # Envia (push) a nova camada de cache para o registry
+
           cache-to: type=registry,ref=${{ steps.vars.outputs.IMAGE }}:buildcache,mode=max
