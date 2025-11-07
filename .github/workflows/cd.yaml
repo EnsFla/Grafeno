@@ -15,7 +15,6 @@ jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     
-    # Rodando no seu agente local
     runs-on: self-hosted
     environment: production
 
@@ -23,29 +22,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # --- MUDANÇA 1: SINTAXE DO POWERSHELL ---
-      # Removemos 'shell: bash' e reescrevemos os comandos
-      # para o PowerShell (nativo do Windows).
+      # --- CORREÇÃO: LÓGICA ROBUSTA DO POWERSHELL ---
       - name: Set vars
         run: |
           echo "IMAGE=ensfla/grafeno" >> $env:GITHUB_OUTPUT
+          
           $SHA = "${{ github.event.workflow_run.head_sha }}"
           $TAG_SHA = $SHA.Substring(0, 7)
           echo "TAG_SHA=$TAG_SHA" >> $env:GITHUB_OUTPUT
-          echo "NAMESPACE=${{ secrets.K8S_NAMESPACE || 'default' }}" >> $env:GITHUB_OUTPUT
 
-      # --- MUDANÇA 2: SINTAXE DO POWERSHELL ---
-      # Removemos 'shell: bash' e usamos a lógica do PowerShell
-      # para verificar se o comando anterior falhou (exit code 0).
+          # Lógica robusta para garantir que $NAMESPACE nunca seja vazio
+          $NAMESPACE = "${{ secrets.K8S_NAMESPACE }}"
+          if ([string]::IsNullOrEmpty($NAMESPACE)) {
+            $NAMESPACE = "default"
+          }
+          echo "NAMESPACE=$NAMESPACE" >> $env:GITHUB_OUTPUT
+
       - name: Create namespace if not exists
         run: |
-          kubectl get ns ${{ steps.vars.outputs.NAMESPACE }}
-          if ($LASTEXITCODE -ne 0) {
-            kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}
+          # Define a variável $NAMESPACE aqui também, por segurança
+          $NAMESPACE = "${{ steps.vars.outputs.NAMESPACE }}"
+          if ([string]::IsNullOrEmpty($NAMESPACE)) {
+            $NAMESPACE = "default"
           }
 
-      # --- MUDANÇA 3: REMOÇÃO DO 'shell: bash' ---
-      # Estes comandos funcionam igual no PowerShell e no Bash
+          kubectl get ns $NAMESPACE
+          if ($LASTEXITCODE -ne 0) {
+            kubectl create ns $NAMESPACE
+          }
+
+      # Os comandos abaixo agora receberão $NAMESPACE='default' corretamente
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
         run: |
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml
