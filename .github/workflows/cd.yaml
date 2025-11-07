@@ -17,7 +17,7 @@ jobs:
     # Só executa se o workflow de CI (workflow_run) foi um SUCESSO
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    environment: production # opcional: exige aprovação de ambiente no GitHub
+    environment: production # opcional
 
     steps:
       - name: Checkout
@@ -26,12 +26,8 @@ jobs:
       - name: Set vars
         id: vars
         run: |
-          # Atualizado para o nome correto da imagem no Docker Hub
           echo "IMAGE=ensfla/grafeno" >> $GITHUB_OUTPUT
-          
-          # Pega o SHA curto do commit que disparou o CI (workflow_run)
           echo "TAG_SHA=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
-          
           echo "NAMESPACE=${{ secrets.K8S_NAMESPACE || 'default' }}" >> $GITHUB_OUTPUT
 
       - name: Setup kubectl
@@ -43,14 +39,9 @@ jobs:
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > $HOME/.kube/config
-
-      # --- CORREÇÃO 1 (Adicionado '|| true' no final) ---
-      - name: Create namespace if not exists
-        run: |
           (kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || \
           kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}) || true
 
-      # (Este passo já estava correto no seu arquivo)
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
         run: |
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml || true
@@ -59,24 +50,24 @@ jobs:
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-deployment.yaml || true
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-service.yaml || true
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-config.yaml || true
+          
+          # --- ESTA É A LINHA ADICIONADA ---
+          # Garante que a configuração do Nginx (que nós corrigimos) seja aplicada
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-configmap.yaml || true
+          # --- FIM DA ADIÇÃO ---
 
-      # --- CORREÇÃO 2 (Adicionado '|| true') ---
       - name: Apply app deployment (first time)
         run: |
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml || true
 
-      # --- CORREÇÃO 3 (Adicionado '|| true') ---
       - name: Set image to new tag
         run: |
           kubectl set image deployment/grafeno grafeno=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n ${{ steps.vars.outputs.NAMESPACE }} || true
 
-      # --- CORREÇÃO 4 (Adicionado '|| true') ---
       - name: Wait rollout
         run: |
           kubectl rollout status deployment/grafeno -n ${{ steps.vars.outputs.NAMESPACE }} --timeout=120s || true
 
-      # --- CORREÇÃO 5 (Adicionado '|| true' em ambas as linhas) ---
       - name: Show services (debug)
         run: |
           kubectl get svc -n ${{ steps.vars.outputs.NAMESPACE }} || true

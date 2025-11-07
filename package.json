@@ -4,8 +4,8 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-  "test": "echo \"Sem testes configurados\" && exit 0",
-  "start": "node server.js"
+    "test": "echo \"Sem testes configurados\" && exit 0",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
