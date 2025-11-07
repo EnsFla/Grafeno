@@ -1,1 +1,8 @@
 node_modules/
+
+.git
+.gitignore
+
+actions-runner/
+
+.DS_Store
