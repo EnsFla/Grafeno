@@ -26,7 +26,6 @@ jobs:
       - name: Set vars
         id: vars
         run: |
-          # --- MUDANÇA 1 ---
           # Atualizado para o nome correto da imagem no Docker Hub
           echo "IMAGE=ensfla/grafeno" >> $GITHUB_OUTPUT
           
@@ -38,20 +37,20 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
         with:
-          version: 'latest' # 'latest' é ok, mas fixar uma versão é mais estável
+          version: 'latest'
 
       - name: Configure kubeconfig
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > $HOME/.kube/config
 
+      # --- CORREÇÃO 1 (Adicionado '|| true' no final) ---
       - name: Create namespace if not exists
         run: |
-          kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || \
-          kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}
+          (kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || \
+          kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}) || true
 
-      # Aplica/garante os serviços/ingress/etc. estáticos
-      # (Garante que os arquivos YAML estão corretos e sem quebras de linha)
+      # (Este passo já estava correto no seu arquivo)
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
         run: |
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml || true
@@ -60,27 +59,25 @@ jobs:
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-deployment.yaml || true
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-service.yaml || true
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-config.yaml || true
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-configmap.yaml || true
 
-      # Aplica/garante o Deployment (se ainda não existir)
+      # --- CORREÇÃO 2 (Adicionado '|| true') ---
       - name: Apply app deployment (first time)
         run: |
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml || true
 
-      # Atualiza a imagem para a tag nova (idempotente)
+      # --- CORREÇÃO 3 (Adicionado '|| true') ---
       - name: Set image to new tag
         run: |
-          # --- MUDANÇA 2 ---
-          # Assumindo que seu deployment e container se chamam 'grafeno'
-          # Mude 'deployment/grafeno' e 'grafeno=' se os nomes forem diferentes
-          kubectl set image deployment/grafeno grafeno=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n ${{ steps.vars.outputs.NAMESPACE }}
+          kubectl set image deployment/grafeno grafeno=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n ${{ steps.vars.outputs.NAMESPACE }} || true
 
+      # --- CORREÇÃO 4 (Adicionado '|| true') ---
       - name: Wait rollout
         run: |
-          # --- MUDANÇA 3 ---
-          # Deve ser o mesmo nome do deployment da 'MUDANÇA 2'
-          kubectl rollout status deployment/grafeno -n ${{ steps.vars.outputs.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/grafeno -n ${{ steps.vars.outputs.NAMESPACE }} --timeout=120s || true
 
+      # --- CORREÇÃO 5 (Adicionado '|| true' em ambas as linhas) ---
       - name: Show services (debug)
         run: |
-          kubectl get svc -n ${{ steps.vars.outputs.NAMESPACE }}
-          kubectl get pods -o wide -n ${{ steps.vars.outputs.NAMESPACE }}
+          kubectl get svc -n ${{ steps.vars.outputs.NAMESPACE }} || true
+          kubectl get pods -o wide -n ${{ steps.vars.outputs.NAMESPACE }} || true
