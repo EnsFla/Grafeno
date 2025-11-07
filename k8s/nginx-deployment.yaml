@@ -27,3 +27,14 @@ spec:
           image: nginx:latest
           ports:
           - containerPort: 80
+          # --- INÍCIO DA CORREÇÃO ---
+          # Diz ao contêiner para montar o volume no local correto
+          volumeMounts:
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/conf.d/
+      # Define o volume que será montado, usando o ConfigMap que criamos
+      volumes:
+        - name: nginx-config-volume
+          configMap:
+            name: nginx-config
+      # --- FIM DA CORREÇÃO ---
