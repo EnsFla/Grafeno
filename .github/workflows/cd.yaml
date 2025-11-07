@@ -29,8 +29,12 @@ jobs:
         uses: actions/checkout@v4
 
       # O 'Set vars' agora só precisa focar nas outras variáveis
+      
+      # --- INÍCIO DA CORREÇÃO ---
       - name: Set vars
+        id: vars  # <-- ESTA É A LINHA QUE FALTAVA
         run: |
+      # --- FIM DA CORREÇÃO ---
           echo "IMAGE=ensfla/grafeno" >> $env:GITHUB_OUTPUT
           $SHA = "${{ github.event.workflow_run.head_sha }}"
           $TAG_SHA = $SHA.Substring(0, 7)
@@ -63,6 +67,8 @@ jobs:
 
       - name: Set image to new tag
         run: |
+          # Agora ${{ steps.vars.outputs.IMAGE }} terá 'ensfla/grafeno'
+          # E ${{ steps.vars.outputs.TAG_SHA }} terá o hash do commit
           kubectl set image deployment/grafeno grafeno=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n $env:K8S_NAMESPACE
 
       - name: Wait rollout
