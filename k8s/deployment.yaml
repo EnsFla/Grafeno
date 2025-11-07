@@ -17,6 +17,6 @@ spec:
       containers:
         - name: grafeno
           image: ensfla/grafeno:latest
-          imagePullPolicy: IfNotPresent 
+          imagePullPolicy: Always 
           ports:
           - containerPort: 3123
