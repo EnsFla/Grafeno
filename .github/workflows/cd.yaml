@@ -16,7 +16,12 @@ jobs:
   deploy:
     # Só executa se o workflow de CI (workflow_run) foi um SUCESSO
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
+    
+    # --- ESTA É A MUDANÇA PRINCIPAL ---
+    # Diz ao GitHub para rodar este job no seu agente local
+    runs-on: self-hosted
+    # ----------------------------------
+
     environment: production # opcional
 
     steps:
@@ -25,50 +30,51 @@ jobs:
 
       - name: Set vars
         id: vars
+        # Usamos 'shell: bash' para consistência entre Windows/Linux
+        shell: bash 
         run: |
           echo "IMAGE=ensfla/grafeno" >> $GITHUB_OUTPUT
           echo "TAG_SHA=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
           echo "NAMESPACE=${{ secrets.K8S_NAMESPACE || 'default' }}" >> $GITHUB_OUTPUT
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: 'latest'
+      # Não precisamos mais dos passos 'Setup kubectl' ou 'Configure kubeconfig'
+      # O seu agente (PC) já tem ambos!
 
-      - name: Configure kubeconfig
+      - name: Create namespace if not exists
+        shell: bash
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > $HOME/.kube/config
-          (kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || \
-          kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}) || true
+          kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}
 
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
+        shell: bash
         run: |
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-deployment.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/grafana-deployment.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-deployment.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-service.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-config.yaml || true
-          
-          # --- ESTA É A LINHA ADICIONADA ---
-          # Garante que a configuração do Nginx (que nós corrigimos) seja aplicada
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-configmap.yaml || true
-          # --- FIM DA ADIÇÃO ---
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-deployment.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/grafana-deployment.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-deployment.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-service.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-config.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-configmap.yaml
 
       - name: Apply app deployment (first time)
+        shell: bash
         run: |
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml || true
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml
 
+      # Este é o passo que faz o "rollout" automático!
+      # Ele atualiza a imagem do deployment para a tag do commit (ex: :a1b2c3d)
       - name: Set image to new tag
+        shell: bash
         run: |
-          kubectl set image deployment/grafeno grafeno=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n ${{ steps.vars.outputs.NAMESPACE }} || true
+          kubectl set image deployment/grafeno grafeno=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n ${{ steps.vars.outputs.NAMESPACE }}
 
       - name: Wait rollout
+        shell: bash
         run: |
-          kubectl rollout status deployment/grafeno -n ${{ steps.vars.outputs.NAMESPACE }} --timeout=120s || true
+          kubectl rollout status deployment/grafeno -n ${{ steps.vars.outputs.NAMESPACE }} --timeout=120s
 
       - name: Show services (debug)
+        shell: bash
         run: |
-          kubectl get svc -n ${{ steps.vars.outputs.NAMESPACE }} || true
-          kubectl get pods -o wide -n ${{ steps.vars.outputs.NAMESPACE }} || true
+          kubectl get svc -n ${{ steps.vars.outputs.NAMESPACE }}
+          kubectl get pods -o wide -n ${{ steps.vars.outputs.NAMESPACE }}
